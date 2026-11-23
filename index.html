@@ -23,12 +23,17 @@
           <p class="text-xs text-indigo-200">CENG 409 Dönem Projesi</p>
         </div>
       </div>
-      <!-- Rol Değiştirici (Hocanın istediği en az 2 rol) -->
+      <!-- 7 Farklı Kullanıcı Rolü Seçici -->
       <div class="text-right">
-        <span class="text-xs block text-indigo-200">Kullanıcı Rolü:</span>
+        <span class="text-[10px] block text-indigo-200 font-medium">Aktif Rol:</span>
         <select id="userRole" onchange="degistirRol()" class="bg-indigo-700 text-xs font-semibold text-white px-2 py-1 rounded border border-indigo-400 focus:outline-none">
           <option value="depo_sorumlusu">👑 Depo Sorumlusu</option>
           <option value="depo_personeli">👷 Depo Personeli</option>
+          <option value="kalite_kontrol">🔬 Kalite Kontrol</option>
+          <option value="satin_alma">💼 Satın Alma Uzmanı</option>
+          <option value="sevkiyat_sorumlusu">🚚 Sevkiyat Sorumlusu</option>
+          <option value="sayim_denetcisi">📋 Sayım & Denetçi</option>
+          <option value="sistem_yoneticisi">⚡ Sistem Yöneticisi (Admin)</option>
         </select>
       </div>
     </div>
@@ -36,6 +41,18 @@
 
   <!-- Ana İçerik / Mobil Kartlar -->
   <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
+
+    <!-- Rol Yetki Bilgilendirme Rozeti -->
+    <div id="roleBadge" class="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 flex items-center justify-between shadow-sm">
+      <div class="flex items-center space-x-2">
+        <span id="roleIcon" class="text-base">👑</span>
+        <div>
+          <strong id="roleTitle" class="block font-bold">Depo Sorumlusu</strong>
+          <span id="roleDesc" class="text-[11px] text-indigo-700">Tüm yetkiler tam aktif.</span>
+        </div>
+      </div>
+      <span class="text-[10px] bg-indigo-200 text-indigo-800 font-bold px-2 py-0.5 rounded-full uppercase">Yetkili</span>
+    </div>
 
     <!-- Bildirim / Uyarı Kutusu -->
     <div id="alertBox" class="hidden p-3 rounded-lg text-sm font-medium transition-all"></div>
@@ -71,7 +88,7 @@
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
       </div>
 
-      <!-- Yeni Ürün Ekle Butonu (Sadece Depo Sorumlusu Görebilir) -->
+      <!-- Yeni Ürün Ekle Butonu (Sadece Yetkili Roller Görebilir) -->
       <div id="adminProductBtn" class="flex justify-end">
         <button onclick="yeniUrunModalAc()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 shadow">
           <i class="fa-solid fa-plus"></i>
@@ -101,7 +118,7 @@
           <option value="giris">📥 Stok Girişi (+)</option>
           <option value="cikis">📤 Stok Çıkışı (-)</option>
           <option value="transfer">🔄 Depolar Arası Transfer</option>
-          <option value="sayim_duzeltme">⚖️ Sayım Düzeltme (Sadece Sorumlu)</option>
+          <option value="sayim_duzeltme">⚖️ Sayım Düzeltme (Denetim & Sorumlu)</option>
         </select>
       </div>
 
@@ -133,7 +150,7 @@
 
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">Açıklama / Not:</label>
-        <input type="text" id="actionDesc" placeholder="Örn: İrsaliye No / Müşteri Teslimatı" class="w-full p-2 bg-slate-50 border rounded-lg text-sm">
+        <input type="text" id="actionDesc" placeholder="Örn: İrsaliye No / Talep No" class="w-full p-2 bg-slate-50 border rounded-lg text-sm">
       </div>
 
       <button onclick="stokHareketiKaydet()" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm shadow transition">
@@ -197,7 +214,6 @@
 
   <!-- UYGULAMA JAVASCRIPT KODLARI (SUPABASE ENTEGRASYONU) -->
   <script>
-    // Supabase Bağlantısı (Kullanıcı Bilgileri)
     const SUPABASE_URL = "https://xsnkfhoircrbizxiditg.supabase.co";
     const SUPABASE_KEY = "sb_publishable_eADCSvq2tX1vGUHFIr5Ewg_fxoHeypA";
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -206,8 +222,83 @@
     let tumDepolar = [];
     let aktifRol = 'depo_sorumlusu';
 
+    // 7 Farklı Rolün Yetki Matrisi ve Tanımları
+    const ROL_YETKILERI = {
+      depo_sorumlusu: {
+        baslik: "Depo Sorumlusu",
+        ikon: "👑",
+        aciklama: "Tüm işlemler tam yetkili: Giriş, Çıkış, Transfer, Düzeltme, Ürün Kartı Açma.",
+        yeniUrun: true,
+        giris: true,
+        cikis: true,
+        transfer: true,
+        sayim_duzeltme: true
+      },
+      depo_personeli: {
+        baslik: "Depo Personeli",
+        ikon: "👷",
+        aciklama: "Günlük operasyon: Giriş, Çıkış ve Transfer yapabilir. Ürün açamaz, Düzeltme yapamaz.",
+        yeniUrun: false,
+        giris: true,
+        cikis: true,
+        transfer: true,
+        sayim_duzeltme: false
+      },
+      kalite_kontrol: {
+        baslik: "Kalite Kontrol Uzmanı",
+        ikon: "🔬",
+        aciklama: "Mal kabul ve inceleme: Sadece Stok Girişi (+) ve stok sorgulama yapabilir.",
+        yeniUrun: false,
+        giris: true,
+        cikis: false,
+        transfer: false,
+        sayim_duzeltme: false
+      },
+      satin_alma: {
+        baslik: "Satın Alma Uzmanı",
+        ikon: "💼",
+        aciklama: "Stok takip ve yeni malzeme: Yeni Ürün Kartı açabilir, stokları izler. Çıkış yapamaz.",
+        yeniUrun: true,
+        giris: true,
+        cikis: false,
+        transfer: false,
+        sayim_duzeltme: false
+      },
+      sevkiyat_sorumlusu: {
+        baslik: "Sevkiyat Sorumlusu",
+        ikon: "🚚",
+        aciklama: "Lojistik & Müşteri çıkışı: Sadece Stok Çıkışı (-) ve Depo Transferi yapabilir.",
+        yeniUrun: false,
+        giris: false,
+        cikis: true,
+        transfer: true,
+        sayim_duzeltme: false
+      },
+      sayim_denetcisi: {
+        baslik: "Sayım & İç Denetçi",
+        ikon: "📋",
+        aciklama: "Envanter mutabakatı: Sayım Düzeltme ve geçmiş inceleme yetkisi vardır.",
+        yeniUrun: false,
+        giris: false,
+        cikis: false,
+        transfer: false,
+        sayim_duzeltme: true
+      },
+      sistem_yoneticisi: {
+        baslik: "Sistem Yöneticisi (Admin)",
+        ikon: "⚡",
+        aciklama: "En üst düzey yönetici: Tüm yetkiler, yapılandırmalar ve veri düzeltmeleri açık.",
+        yeniUrun: true,
+        giris: true,
+        cikis: true,
+        transfer: true,
+        sayim_duzeltme: true
+      }
+    };
+
     // Sayfa Yüklendiğinde
     window.addEventListener('DOMContentLoaded', async () => {
+      degistirRol();
       await depolariYukle();
       await urunleriVeStoklariYukle();
       await gecmisiYukle();
@@ -216,14 +307,21 @@
     // Rol Değiştirme
     function degistirRol() {
       aktifRol = document.getElementById('userRole').value;
+      const yetki = ROL_YETKILERI[aktifRol];
+      
+      document.getElementById('roleIcon').innerText = yetki.ikon;
+      document.getElementById('roleTitle').innerText = yetki.baslik;
+      document.getElementById('roleDesc').innerText = yetki.aciklama;
+
+      // Ürün ekleme butonu yetki kontrolü
       const adminBtn = document.getElementById('adminProductBtn');
-      if (aktifRol === 'depo_sorumlusu') {
+      if (yetki.yeniUrun) {
         adminBtn.classList.remove('hidden');
-        bildirimGoster("👑 Depo Sorumlusu rolüne geçildi. Tüm yetkiler aktif.", "bg-indigo-100 text-indigo-800");
       } else {
         adminBtn.classList.add('hidden');
-        bildirimGoster("👷 Depo Personeli rolüne geçildi. Yetkiler sınırlandırıldı.", "bg-amber-100 text-amber-800");
       }
+
+      bildirimGoster(`${yetki.ikon} Aktif rol: ${yetki.baslik}. Arayüz yetkileri güncellendi.`, "bg-indigo-100 text-indigo-800");
     }
 
     // Bildirim Gösterme
@@ -254,7 +352,7 @@
 
       if (pErr) {
         console.error("Hata:", pErr);
-        document.getElementById('productList').innerHTML = `<p class="text-center text-xs text-rose-500 py-4">Veri yüklenemedi. Lütfen Supabase bağlantısını kontrol edin.</p>`;
+        document.getElementById('productList').innerHTML = `<p class="text-center text-xs text-rose-500 py-4">Veri yüklenemedi. Lütfen interneti kontrol edin.</p>`;
         return;
       }
 
@@ -264,7 +362,6 @@
         return { ...p, toplamMiktar, detaylar: productStocks };
       });
 
-      // İşlem sekmesindeki ürün seçiciyi güncelle
       const pSelect = document.getElementById('actionProduct');
       pSelect.innerHTML = tumUrunler.map(p => `<option value="${p.id}">[${p.code}] ${p.name} (Stok: ${p.toplamMiktar} ${p.unit})</option>`).join('');
 
@@ -350,7 +447,7 @@
       }
     }
 
-    // STOK HAREKETİ KAYDET (HOCANIN İSTEDİĞİ KÖTÜ DURUM KONTROLLERİ VE İŞ KURALLARI)
+    // STOK HAREKETİ KAYDET (ROL BAZLI YETKİ VE KÖTÜ DURUM KONTROLLERİ)
     async function stokHareketiKaydet() {
       const tur = document.getElementById('actionType').value;
       const productId = document.getElementById('actionProduct').value;
@@ -360,19 +457,21 @@
       const miktar = parseInt(document.getElementById('actionQuantity').value);
       const desc = document.getElementById('actionDesc').value.trim();
 
-      // KÖTÜ DURUM 1: Negatif veya sıfır miktar girişi
+      const yetki = ROL_YETKILERI[aktifRol];
+
+      // KONTROL 1: ROL YETKİ KONTROLÜ
+      if (!yetki[tur]) {
+        bildirimGoster(`YETKİSİZ İŞLEM: "${yetki.baslik}" rolü "${tur.toUpperCase()}" işlemi yapamaz!`, "bg-rose-100 text-rose-800");
+        return;
+      }
+
+      // KONTROL 2: Negatif veya geçersiz miktar
       if (isNaN(miktar) || miktar <= 0) {
         bildirimGoster("Hata: İşlem miktarı 1 veya daha büyük olmalıdır!", "bg-rose-100 text-rose-800");
         return;
       }
 
-      // KÖTÜ DURUM 2: Yetkisiz kullanıcının sayım düzeltmesi yapmaya çalışması
-      if (tur === 'sayim_duzeltme' && aktifRol !== 'depo_sorumlusu') {
-        bildirimGoster("YETKİSİZ İŞLEM: Sayım düzeltme işlemini yalnızca Depo Sorumlusu yapabilir!", "bg-rose-100 text-rose-800");
-        return;
-      }
-
-      // KÖTÜ DURUM 3: Transferde kaynak ve hedef deponun aynı seçilmesi
+      // KONTROL 3: Transferde kaynak ve hedef deponun aynı seçilmesi
       if (tur === 'transfer' && sourceWarehouseId === targetWarehouseId) {
         bildirimGoster("Hata: Kaynak ve hedef depo aynı olamaz!", "bg-rose-100 text-rose-800");
         return;
@@ -387,14 +486,13 @@
       const mevcutKayit = stockRecords && stockRecords[0] ? stockRecords[0] : null;
       const mevcutStok = mevcutKayit ? mevcutKayit.quantity : 0;
 
-      // KÖTÜ DURUM 4: Mevcut stoktan fazla çıkış veya transfer yapılmaya çalışılması (Negatif stok engelleme)
+      // KONTROL 4: Mevcut stoktan fazla çıkış (Negatif stok engelleme)
       if ((tur === 'cikis' || tur === 'transfer') && miktar > mevcutStok) {
         bildirimGoster(`YETERSİZ STOK: Depoda sadece ${mevcutStok} adet var. ${miktar} adet çıkış yapılamaz!`, "bg-rose-100 text-rose-800");
         return;
       }
 
       try {
-        // 1. Stok tablosunu güncelle
         if (tur === 'giris') {
           if (mevcutKayit) {
             await db.from('stock').update({ quantity: mevcutStok + miktar }).eq('id', mevcutKayit.id);
@@ -404,9 +502,7 @@
         } else if (tur === 'cikis') {
           await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
         } else if (tur === 'transfer') {
-          // Kaynaktan düş
           await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
-          // Hedefe ekle
           const { data: targetRecords } = await db.from('stock').select('*').eq('product_id', productId).eq('warehouse_id', targetWarehouseId);
           if (targetRecords && targetRecords[0]) {
             await db.from('stock').update({ quantity: targetRecords[0].quantity + miktar }).eq('id', targetRecords[0].id);
@@ -421,7 +517,7 @@
           }
         }
 
-        // 2. Hareket Geçmişine Kaydet (Audit Log)
+        // Hareket Geçmişine Kaydet
         await db.from('stock_transactions').insert({
           transaction_type: tur,
           product_id: productId,
@@ -429,17 +525,17 @@
           target_warehouse_id: tur === 'transfer' ? targetWarehouseId : null,
           quantity: miktar,
           user_email: `${aktifRol}@pau.edu.tr`,
-          description: desc || `${tur.toUpperCase()} işlemi gerçekleştirildi.`
+          description: desc || `[${yetki.baslik}] tarafından ${tur.toUpperCase()} yapıldı.`
         });
 
-        bildirimGoster("✅ Stok hareketi başarıyla kaydedildi ve veritabanı güncellendi!", "bg-emerald-100 text-emerald-800");
+        bildirimGoster(`✅ [${yetki.baslik}] işlemi başarıyla tamamladı!`, "bg-emerald-100 text-emerald-800");
         document.getElementById('actionDesc').value = '';
         await urunleriVeStoklariYukle();
         sekmeDegistir('stok');
 
       } catch (err) {
         console.error(err);
-        bildirimGoster("Kayıt sırasında bir hata meydana geldi: " + err.message, "bg-rose-100 text-rose-800");
+        bildirimGoster("Kayıt sırasında hata: " + err.message, "bg-rose-100 text-rose-800");
       }
     }
 
@@ -488,7 +584,14 @@
     }
 
     // Modal İşlemleri
-    function yeniUrunModalAc() { document.getElementById('productModal').classList.remove('hidden'); }
+    function yeniUrunModalAc() {
+      const yetki = ROL_YETKILERI[aktifRol];
+      if (!yetki.yeniUrun) {
+        bildirimGoster(`YETKİSİZ: "${yetki.baslik}" rolü yeni ürün kartı açamaz!`, "bg-rose-100 text-rose-800");
+        return;
+      }
+      document.getElementById('productModal').classList.remove('hidden');
+    }
     function modalKapat() { document.getElementById('productModal').classList.add('hidden'); }
     async function yeniUrunKaydet() {
       const code = document.getElementById('newCode').value.trim().toUpperCase();
