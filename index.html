@@ -4,16 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mobil Depo & Stok Takip Sistemi | CENG 409</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen pb-16">
 
-  <!-- Üst Başlık / Header -->
   <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
     <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-2">
@@ -23,26 +19,18 @@
           <p class="text-xs text-indigo-200">CENG 409 Dönem Projesi</p>
         </div>
       </div>
-      <!-- 7 Farklı Kullanıcı Rolü Seçici -->
       <div class="text-right">
         <span class="text-[10px] block text-indigo-200 font-medium">Aktif Rol:</span>
         <select id="userRole" onchange="degistirRol()" class="bg-indigo-700 text-xs font-semibold text-white px-2 py-1 rounded border border-indigo-400 focus:outline-none">
           <option value="depo_sorumlusu">👑 Depo Sorumlusu</option>
           <option value="depo_personeli">👷 Depo Personeli</option>
-          <option value="kalite_kontrol">🔬 Kalite Kontrol</option>
-          <option value="satin_alma">💼 Satın Alma Uzmanı</option>
-          <option value="sevkiyat_sorumlusu">🚚 Sevkiyat Sorumlusu</option>
-          <option value="sayim_denetcisi">📋 Sayım & Denetçi</option>
-          <option value="sistem_yoneticisi">⚡ Sistem Yöneticisi (Admin)</option>
         </select>
       </div>
     </div>
   </header>
 
-  <!-- Ana İçerik / Mobil Kartlar -->
   <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
 
-    <!-- Rol Yetki Bilgilendirme Rozeti -->
     <div id="roleBadge" class="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 flex items-center justify-between shadow-sm">
       <div class="flex items-center space-x-2">
         <span id="roleIcon" class="text-base">👑</span>
@@ -54,10 +42,8 @@
       <span class="text-[10px] bg-indigo-200 text-indigo-800 font-bold px-2 py-0.5 rounded-full uppercase">Yetkili</span>
     </div>
 
-    <!-- Bildirim / Uyarı Kutusu -->
     <div id="alertBox" class="hidden p-3 rounded-lg text-sm font-medium transition-all"></div>
 
-    <!-- Kritik Stok Uyarısı Banner'ı (Hocanın şartı) -->
     <div id="criticalStockBanner" class="hidden bg-rose-50 border-l-4 border-rose-500 p-3 rounded shadow-sm">
       <div class="flex items-center space-x-2 text-rose-700 font-bold text-xs uppercase">
         <i class="fa-solid fa-triangle-exclamation text-base"></i>
@@ -66,37 +52,46 @@
       <ul id="criticalList" class="mt-1 text-xs text-rose-800 list-disc list-inside"></ul>
     </div>
 
-    <!-- Tab / Sekme Butonları -->
-    <div class="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl text-center text-xs font-bold">
+    <div id="molaBanner" class="hidden bg-amber-50 border-l-4 border-amber-500 p-3 rounded shadow-sm text-xs text-amber-800">
+      <div class="flex items-center space-x-2 font-bold uppercase text-[11px] text-amber-900">
+        <i class="fa-solid fa-mug-hot text-base text-amber-600"></i>
+        <span>Mola Durumu Aktif</span>
+      </div>
+      <p class="mt-1 leading-snug">
+        Şu an <strong id="molaDetayMetin">Mola</strong> durumundasınız. Depo güvenlik iş kuralı gereğince mola bitene kadar stok hareketleri kilitlenmiştir.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-4 gap-1 bg-slate-200 p-1 rounded-xl text-center text-[11px] font-bold">
       <button onclick="sekmeDegistir('stok')" id="tab-stok" class="py-2 rounded-lg bg-white text-indigo-600 shadow">
         <i class="fa-solid fa-layer-group block text-sm mb-1"></i>Stoklar
       </button>
       <button onclick="sekmeDegistir('islem')" id="tab-islem" class="py-2 rounded-lg text-slate-600">
-        <i class="fa-solid fa-arrow-right-arrow-left block text-sm mb-1"></i>Hızlı İşlem
+        <i class="fa-solid fa-arrow-right-arrow-left block text-sm mb-1"></i>İşlem
       </button>
       <button onclick="sekmeDegistir('gecmis')" id="tab-gecmis" class="py-2 rounded-lg text-slate-600">
         <i class="fa-solid fa-clock-rotate-left block text-sm mb-1"></i>Geçmiş
       </button>
+      <button onclick="sekmeDegistir('mola')" id="tab-mola" class="py-2 rounded-lg text-slate-600">
+        <i class="fa-solid fa-mug-hot block text-sm mb-1"></i>Molalar
+      </button>
     </div>
 
-    <!-- 1. SEKME: GÜNCEL STOK LİSTESİ VE ARAMA -->
+    <!-- 1. SEKME: STOKLAR -->
     <section id="sec-stok" class="space-y-3">
-      <!-- Arama Kutusu -->
       <div class="relative">
-        <input type="text" id="searchInput" oninput="urunFiltrele()" placeholder="Ürün kodu veya adı ile ara..." 
+        <input type="text" id="searchInput" oninput="urunFiltrele()" placeholder="Ürün kodu veya adı ile ara..."
                class="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl shadow-sm border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
       </div>
 
-      <!-- Yeni Ürün Ekle Butonu (Sadece Yetkili Roller Görebilir) -->
       <div id="adminProductBtn" class="flex justify-end">
-        <button onclick="yeniUrunModalAc()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 shadow">
+        <button onclick="yeniUrunModalAc()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 shadow">
           <i class="fa-solid fa-plus"></i>
           <span>Yeni Ürün Tanımla</span>
         </button>
       </div>
 
-      <!-- Ürün Kartları Listesi -->
       <div id="productList" class="space-y-2.5">
         <div class="text-center py-8 text-slate-400 text-sm">
           <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-indigo-500"></i>
@@ -105,38 +100,33 @@
       </div>
     </section>
 
-    <!-- 2. SEKME: STOK İŞLEMİ (GİRİŞ / ÇIKIŞ / TRANSFER) -->
+    <!-- 2. SEKME: İŞLEM -->
     <section id="sec-islem" class="hidden bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
       <h2 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b pb-2">
         <i class="fa-solid fa-dolly text-indigo-600"></i>
         <span>Stok Hareketi Gerçekleştir</span>
       </h2>
-
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">İşlem Türü:</label>
         <select id="actionType" onchange="islemTuruDegisti()" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500">
           <option value="giris">📥 Stok Girişi (+)</option>
           <option value="cikis">📤 Stok Çıkışı (-)</option>
           <option value="transfer">🔄 Depolar Arası Transfer</option>
-          <option value="sayim_duzeltme">⚖️ Sayım Düzeltme (Denetim & Sorumlu)</option>
+          <option value="sayim_duzeltme">⚖️ Sayım Düzeltme (Sadece Sorumlu)</option>
         </select>
       </div>
-
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">Ürün Seçin:</label>
         <select id="actionProduct" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
       </div>
-
       <div id="sourceWarehouseDiv">
         <label id="sourceLabel" class="block text-xs font-semibold text-slate-600 mb-1">Depo / Ambar:</label>
         <select id="sourceWarehouse" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
       </div>
-
       <div id="targetWarehouseDiv" class="hidden">
         <label class="block text-xs font-semibold text-slate-600 mb-1">Hedef Depo (Transfer):</label>
         <select id="targetWarehouse" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
       </div>
-
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">Raf Konumu:</label>
@@ -147,18 +137,16 @@
           <input type="number" id="actionQuantity" min="1" value="1" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-bold text-indigo-600">
         </div>
       </div>
-
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">Açıklama / Not:</label>
         <input type="text" id="actionDesc" placeholder="Örn: İrsaliye No / Talep No" class="w-full p-2 bg-slate-50 border rounded-lg text-sm">
       </div>
-
       <button onclick="stokHareketiKaydet()" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm shadow transition">
         İşlemi Tamamla ve Kaydet
       </button>
     </section>
 
-    <!-- 3. SEKME: İŞLEM GEÇMİŞİ / AUDIT LOG -->
+    <!-- 3. SEKME: GEÇMİŞ -->
     <section id="sec-gecmis" class="hidden space-y-2">
       <div class="flex justify-between items-center px-1">
         <h2 class="text-xs font-bold text-slate-600 uppercase">Son Stok Hareketleri</h2>
@@ -168,6 +156,61 @@
       </div>
       <div id="historyList" class="space-y-2">
         <p class="text-center text-xs text-slate-400 py-4">Kayıtlar yükleniyor...</p>
+      </div>
+    </section>
+
+    <!-- 4. SEKME: MOLALAR -->
+    <section id="sec-mola" class="hidden space-y-3">
+      <div id="molaAdminView" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b pb-2">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-mug-hot text-indigo-600 text-lg"></i>
+            <h2 class="text-sm font-bold text-slate-800">Personele Mola Tanımla</h2>
+          </div>
+          <span class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">Yönetici Paneli</span>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Mola Verilecek Personel:</label>
+          <select id="molaPersonelSelect" class="w-full p-2 bg-slate-50 border rounded-lg text-xs font-medium">
+            <option value="Tüm Depo Personeli">👷 Tüm Depo Personeli (Toplu Mola)</option>
+            <option value="Ahmet Yılmaz (Personel 1)">👷 Ahmet Yılmaz (Personel 1)</option>
+            <option value="Mehmet Demir (Personel 2)">👷 Mehmet Demir (Personel 2)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Mola Türü:</label>
+          <select id="molaTuruSelect" class="w-full p-2 bg-slate-50 border rounded-lg text-xs font-medium">
+            <option value="☕ Çay Molası (15 dk)">☕ Çay Molası (15 Dakika)</option>
+            <option value="🍽️ Öğle Yemeği (45 dk)">🍽️ Öğle Yemeği (45 Dakika)</option>
+            <option value="🚻 İhtiyaç / Dinlenme (10 dk)">🚻 İhtiyaç / Dinlenme (10 Dakika)</option>
+            <option value="🛑 İş Güvenliği Eğitimi (30 dk)">🛑 İş Güvenliği Eğitimi (30 Dakika)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Açıklama / Vardiya Notu:</label>
+          <input type="text" id="molaNotu" placeholder="Örn: 1. Vardiya ara dinlenmesi" class="w-full p-2 bg-slate-50 border rounded-lg text-xs">
+        </div>
+        <button onclick="molaBaslat()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-lg text-xs shadow transition flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-play text-xs"></i>
+          <span>Molayı Başlat ve Stok İşlemlerini Kilitle</span>
+        </button>
+      </div>
+
+      <div id="molaUserView" class="hidden bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center space-y-2">
+        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl">
+          <i class="fa-solid fa-mug-hot"></i>
+        </div>
+        <h3 class="text-sm font-bold text-slate-800">Personel Mola Durumu</h3>
+        <p class="text-xs text-slate-600 font-medium" id="userMolaStatusText">Şu an aktif bir molanız bulunmamaktadır. Görevinize devam edebilirsiniz.</p>
+        <div class="text-[11px] text-slate-400 italic pt-2 border-t">Mola başlatma ve bitirme yetkisi sadece Depo Sorumlusu'ndadır.</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-2">
+        <div class="flex justify-between items-center">
+          <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide">Mola Durum Takibi</h3>
+          <span id="molaSayisiRozet" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">0 Aktif</span>
+        </div>
+        <div id="molaListesi" class="space-y-2 text-xs"></div>
       </div>
     </section>
 
@@ -212,7 +255,6 @@
     </div>
   </div>
 
-  <!-- UYGULAMA JAVASCRIPT KODLARI (SUPABASE ENTEGRASYONU) -->
   <script>
     const SUPABASE_URL = "https://xsnkfhoircrbizxiditg.supabase.co";
     const SUPABASE_KEY = "sb_publishable_eADCSvq2tX1vGUHFIr5Ewg_fxoHeypA";
@@ -222,81 +264,19 @@
     let tumDepolar = [];
     let aktifRol = 'depo_sorumlusu';
 
-    // 7 Farklı Rolün Yetki Matrisi ve Tanımları
     const ROL_YETKILERI = {
       depo_sorumlusu: {
-        baslik: "Depo Sorumlusu",
-        ikon: "👑",
-        aciklama: "Tüm işlemler tam yetkili: Giriş, Çıkış, Transfer, Düzeltme, Ürün Kartı Açma.",
-        yeniUrun: true,
-        giris: true,
-        cikis: true,
-        transfer: true,
-        sayim_duzeltme: true
+        baslik: "Depo Sorumlusu", ikon: "👑",
+        aciklama: "Tüm yetkilere sahiptir: Giriş, Çıkış, Transfer, Sayım Düzeltme ve Yeni Ürün Açma.",
+        yeniUrun: true, giris: true, cikis: true, transfer: true, sayim_duzeltme: true
       },
       depo_personeli: {
-        baslik: "Depo Personeli",
-        ikon: "👷",
-        aciklama: "Günlük operasyon: Giriş, Çıkış ve Transfer yapabilir. Ürün açamaz, Düzeltme yapamaz.",
-        yeniUrun: false,
-        giris: true,
-        cikis: true,
-        transfer: true,
-        sayim_duzeltme: false
-      },
-      kalite_kontrol: {
-        baslik: "Kalite Kontrol Uzmanı",
-        ikon: "🔬",
-        aciklama: "Mal kabul ve inceleme: Sadece Stok Girişi (+) ve stok sorgulama yapabilir.",
-        yeniUrun: false,
-        giris: true,
-        cikis: false,
-        transfer: false,
-        sayim_duzeltme: false
-      },
-      satin_alma: {
-        baslik: "Satın Alma Uzmanı",
-        ikon: "💼",
-        aciklama: "Stok takip ve yeni malzeme: Yeni Ürün Kartı açabilir, stokları izler. Çıkış yapamaz.",
-        yeniUrun: true,
-        giris: true,
-        cikis: false,
-        transfer: false,
-        sayim_duzeltme: false
-      },
-      sevkiyat_sorumlusu: {
-        baslik: "Sevkiyat Sorumlusu",
-        ikon: "🚚",
-        aciklama: "Lojistik & Müşteri çıkışı: Sadece Stok Çıkışı (-) ve Depo Transferi yapabilir.",
-        yeniUrun: false,
-        giris: false,
-        cikis: true,
-        transfer: true,
-        sayim_duzeltme: false
-      },
-      sayim_denetcisi: {
-        baslik: "Sayım & İç Denetçi",
-        ikon: "📋",
-        aciklama: "Envanter mutabakatı: Sayım Düzeltme ve geçmiş inceleme yetkisi vardır.",
-        yeniUrun: false,
-        giris: false,
-        cikis: false,
-        transfer: false,
-        sayim_duzeltme: true
-      },
-      sistem_yoneticisi: {
-        baslik: "Sistem Yöneticisi (Admin)",
-        ikon: "⚡",
-        aciklama: "En üst düzey yönetici: Tüm yetkiler, yapılandırmalar ve veri düzeltmeleri açık.",
-        yeniUrun: true,
-        giris: true,
-        cikis: true,
-        transfer: true,
-        sayim_duzeltme: true
+        baslik: "Depo Personeli", ikon: "👷",
+        aciklama: "Sadece operasyonel yetki: Giriş, Çıkış ve Transfer yapabilir. Ürün açamaz, Düzeltme yapamaz.",
+        yeniUrun: false, giris: true, cikis: true, transfer: true, sayim_duzeltme: false
       }
     };
 
-    // Sayfa Yüklendiğinde
     window.addEventListener('DOMContentLoaded', async () => {
       degistirRol();
       await depolariYukle();
@@ -304,27 +284,19 @@
       await gecmisiYukle();
     });
 
-    // Rol Değiştirme
     function degistirRol() {
       aktifRol = document.getElementById('userRole').value;
       const yetki = ROL_YETKILERI[aktifRol];
-      
       document.getElementById('roleIcon').innerText = yetki.ikon;
       document.getElementById('roleTitle').innerText = yetki.baslik;
       document.getElementById('roleDesc').innerText = yetki.aciklama;
-
-      // Ürün ekleme butonu yetki kontrolü
       const adminBtn = document.getElementById('adminProductBtn');
-      if (yetki.yeniUrun) {
-        adminBtn.classList.remove('hidden');
-      } else {
-        adminBtn.classList.add('hidden');
-      }
-
-      bildirimGoster(`${yetki.ikon} Aktif rol: ${yetki.baslik}. Arayüz yetkileri güncellendi.`, "bg-indigo-100 text-indigo-800");
+      if (yetki.yeniUrun) adminBtn.classList.remove('hidden');
+      else adminBtn.classList.add('hidden');
+      molaArayuzunuGuncelle();
+      bildirimGoster(`${yetki.ikon} Aktif rol: ${yetki.baslik}.`, "bg-indigo-100 text-indigo-800");
     }
 
-    // Bildirim Gösterme
     function bildirimGoster(mesaj, stil = "bg-emerald-100 text-emerald-800") {
       const box = document.getElementById('alertBox');
       box.className = `p-3 rounded-lg text-xs font-medium transition-all shadow-sm ${stil}`;
@@ -333,50 +305,38 @@
       setTimeout(() => box.classList.add('hidden'), 5000);
     }
 
-    // Depoları Çek
     async function depolariYukle() {
       const { data, error } = await db.from('warehouses').select('*');
       if (!error && data) {
         tumDepolar = data;
-        const sSelect = document.getElementById('sourceWarehouse');
-        const tSelect = document.getElementById('targetWarehouse');
-        sSelect.innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
-        tSelect.innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
+        document.getElementById('sourceWarehouse').innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
+        document.getElementById('targetWarehouse').innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
       }
     }
 
-    // Ürünleri ve Stokları Çek
     async function urunleriVeStoklariYukle() {
       const { data: products, error: pErr } = await db.from('products').select('*').order('code');
-      const { data: stocks, error: sErr } = await db.from('stock').select('*');
-
+      const { data: stocks } = await db.from('stock').select('*');
       if (pErr) {
-        console.error("Hata:", pErr);
         document.getElementById('productList').innerHTML = `<p class="text-center text-xs text-rose-500 py-4">Veri yüklenemedi. Lütfen interneti kontrol edin.</p>`;
         return;
       }
-
       tumUrunler = products.map(p => {
         const productStocks = (stocks || []).filter(s => s.product_id === p.id);
         const toplamMiktar = productStocks.reduce((sum, item) => sum + item.quantity, 0);
         return { ...p, toplamMiktar, detaylar: productStocks };
       });
-
-      const pSelect = document.getElementById('actionProduct');
-      pSelect.innerHTML = tumUrunler.map(p => `<option value="${p.id}">[${p.code}] ${p.name} (Stok: ${p.toplamMiktar} ${p.unit})</option>`).join('');
-
+      document.getElementById('actionProduct').innerHTML = tumUrunler.map(p => `<option value="${p.id}">[${p.code}] ${p.name} (Stok: ${p.toplamMiktar} ${p.unit})</option>`).join('');
       kartlariEkranaBas(tumUrunler);
       kritikStokKontrol(tumUrunler);
     }
 
-    // Kartları Bas
     function kartlariEkranaBas(liste) {
       const container = document.getElementById('productList');
       if (liste.length === 0) {
         container.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Kayıtlı ürün bulunamadı.</p>`;
         return;
       }
-
       container.innerHTML = liste.map(item => {
         const isKritik = item.toplamMiktar <= item.critical_stock;
         return `
@@ -391,7 +351,6 @@
                 <span class="text-xs text-slate-500 font-medium ml-0.5">${item.unit}</span>
               </div>
             </div>
-            
             <div class="flex justify-between items-center text-xs text-slate-500 pt-1 border-t border-slate-100">
               <span>Kritik Eşik: <strong class="text-slate-700">${item.critical_stock} ${item.unit}</strong></span>
               ${isKritik ? '<span class="text-rose-600 font-bold flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Kritik Seviye!</span>' : '<span class="text-emerald-600 font-medium"><i class="fa-solid fa-check mr-1"></i>Yeterli</span>'}
@@ -401,53 +360,44 @@
       }).join('');
     }
 
-    // Kritik Stok Kontrolü
     function kritikStokKontrol(liste) {
       const kritikOlanlar = liste.filter(i => i.toplamMiktar <= i.critical_stock);
       const banner = document.getElementById('criticalStockBanner');
-      const kList = document.getElementById('criticalList');
       if (kritikOlanlar.length > 0) {
         banner.classList.remove('hidden');
-        kList.innerHTML = kritikOlanlar.map(k => `<li><strong>${k.name}</strong> (${k.toplamMiktar} ${k.unit} kaldı, kritik sınır: ${k.critical_stock})</li>`).join('');
+        document.getElementById('criticalList').innerHTML = kritikOlanlar.map(k => `<li><strong>${k.name}</strong> (${k.toplamMiktar} ${k.unit} kaldı, kritik sınır: ${k.critical_stock})</li>`).join('');
       } else {
         banner.classList.add('hidden');
       }
     }
 
-    // Arama Filtresi
     function urunFiltrele() {
       const term = document.getElementById('searchInput').value.toLowerCase();
-      const filtrelenmis = tumUrunler.filter(u => u.name.toLowerCase().includes(term) || u.code.toLowerCase().includes(term));
-      kartlariEkranaBas(filtrelenmis);
+      kartlariEkranaBas(tumUrunler.filter(u => u.name.toLowerCase().includes(term) || u.code.toLowerCase().includes(term)));
     }
 
-    // Sekme Değiştirici
     function sekmeDegistir(sekme) {
-      ['stok', 'islem', 'gecmis'].forEach(s => {
+      ['stok', 'islem', 'gecmis', 'mola'].forEach(s => {
         document.getElementById(`sec-${s}`).classList.add('hidden');
         document.getElementById(`tab-${s}`).className = "py-2 rounded-lg text-slate-600";
       });
       document.getElementById(`sec-${sekme}`).classList.remove('hidden');
       document.getElementById(`tab-${sekme}`).className = "py-2 rounded-lg bg-white text-indigo-600 shadow font-bold";
       if (sekme === 'gecmis') gecmisiYukle();
+      if (sekme === 'mola') molaArayuzunuGuncelle();
     }
 
-    // İşlem Türü Değişimi
     function islemTuruDegisti() {
       const tur = document.getElementById('actionType').value;
-      const targetDiv = document.getElementById('targetWarehouseDiv');
-      const sourceLabel = document.getElementById('sourceLabel');
-      
       if (tur === 'transfer') {
-        targetDiv.classList.remove('hidden');
-        sourceLabel.innerText = "Kaynak Depo (Çıkış):";
+        document.getElementById('targetWarehouseDiv').classList.remove('hidden');
+        document.getElementById('sourceLabel').innerText = "Kaynak Depo (Çıkış):";
       } else {
-        targetDiv.classList.add('hidden');
-        sourceLabel.innerText = "Depo / Ambar:";
+        document.getElementById('targetWarehouseDiv').classList.add('hidden');
+        document.getElementById('sourceLabel').innerText = "Depo / Ambar:";
       }
     }
 
-    // STOK HAREKETİ KAYDET (ROL BAZLI YETKİ VE KÖTÜ DURUM KONTROLLERİ)
     async function stokHareketiKaydet() {
       const tur = document.getElementById('actionType').value;
       const productId = document.getElementById('actionProduct').value;
@@ -456,37 +406,30 @@
       const shelf = document.getElementById('actionShelf').value.trim() || 'A1';
       const miktar = parseInt(document.getElementById('actionQuantity').value);
       const desc = document.getElementById('actionDesc').value.trim();
-
       const yetki = ROL_YETKILERI[aktifRol];
 
-      // KONTROL 1: ROL YETKİ KONTROLÜ
+      if (aktifRol === 'depo_personeli' && aktifMolaVarMi()) {
+        const aktifMola = aktifMolaGetir();
+        bildirimGoster(`❌ İŞLEM ENGELLENDİ: Personel şu an "${aktifMola.tur}" durumundadır! Mola bitmeden stok hareketi yapılamaz.`, "bg-rose-100 text-rose-800");
+        return;
+      }
       if (!yetki[tur]) {
         bildirimGoster(`YETKİSİZ İŞLEM: "${yetki.baslik}" rolü "${tur.toUpperCase()}" işlemi yapamaz!`, "bg-rose-100 text-rose-800");
         return;
       }
-
-      // KONTROL 2: Negatif veya geçersiz miktar
       if (isNaN(miktar) || miktar <= 0) {
         bildirimGoster("Hata: İşlem miktarı 1 veya daha büyük olmalıdır!", "bg-rose-100 text-rose-800");
         return;
       }
-
-      // KONTROL 3: Transferde kaynak ve hedef deponun aynı seçilmesi
       if (tur === 'transfer' && sourceWarehouseId === targetWarehouseId) {
         bildirimGoster("Hata: Kaynak ve hedef depo aynı olamaz!", "bg-rose-100 text-rose-800");
         return;
       }
 
-      // Mevcut depodaki stok kaydını kontrol et
-      const { data: stockRecords } = await db.from('stock')
-        .select('*')
-        .eq('product_id', productId)
-        .eq('warehouse_id', sourceWarehouseId);
-
+      const { data: stockRecords } = await db.from('stock').select('*').eq('product_id', productId).eq('warehouse_id', sourceWarehouseId);
       const mevcutKayit = stockRecords && stockRecords[0] ? stockRecords[0] : null;
       const mevcutStok = mevcutKayit ? mevcutKayit.quantity : 0;
 
-      // KONTROL 4: Mevcut stoktan fazla çıkış (Negatif stok engelleme)
       if ((tur === 'cikis' || tur === 'transfer') && miktar > mevcutStok) {
         bildirimGoster(`YETERSİZ STOK: Depoda sadece ${mevcutStok} adet var. ${miktar} adet çıkış yapılamaz!`, "bg-rose-100 text-rose-800");
         return;
@@ -494,37 +437,25 @@
 
       try {
         if (tur === 'giris') {
-          if (mevcutKayit) {
-            await db.from('stock').update({ quantity: mevcutStok + miktar }).eq('id', mevcutKayit.id);
-          } else {
-            await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf: shelf, quantity: miktar });
-          }
+          if (mevcutKayit) await db.from('stock').update({ quantity: mevcutStok + miktar }).eq('id', mevcutKayit.id);
+          else await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf, quantity: miktar });
         } else if (tur === 'cikis') {
           await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
         } else if (tur === 'transfer') {
           await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
           const { data: targetRecords } = await db.from('stock').select('*').eq('product_id', productId).eq('warehouse_id', targetWarehouseId);
-          if (targetRecords && targetRecords[0]) {
-            await db.from('stock').update({ quantity: targetRecords[0].quantity + miktar }).eq('id', targetRecords[0].id);
-          } else {
-            await db.from('stock').insert({ product_id: productId, warehouse_id: targetWarehouseId, shelf: shelf, quantity: miktar });
-          }
+          if (targetRecords && targetRecords[0]) await db.from('stock').update({ quantity: targetRecords[0].quantity + miktar }).eq('id', targetRecords[0].id);
+          else await db.from('stock').insert({ product_id: productId, warehouse_id: targetWarehouseId, shelf, quantity: miktar });
         } else if (tur === 'sayim_duzeltme') {
-          if (mevcutKayit) {
-            await db.from('stock').update({ quantity: miktar }).eq('id', mevcutKayit.id);
-          } else {
-            await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf: shelf, quantity: miktar });
-          }
+          if (mevcutKayit) await db.from('stock').update({ quantity: miktar }).eq('id', mevcutKayit.id);
+          else await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf, quantity: miktar });
         }
 
-        // Hareket Geçmişine Kaydet
         await db.from('stock_transactions').insert({
-          transaction_type: tur,
-          product_id: productId,
+          transaction_type: tur, product_id: productId,
           source_warehouse_id: sourceWarehouseId,
           target_warehouse_id: tur === 'transfer' ? targetWarehouseId : null,
-          quantity: miktar,
-          user_email: `${aktifRol}@pau.edu.tr`,
+          quantity: miktar, user_email: `${aktifRol}@pau.edu.tr`,
           description: desc || `[${yetki.baslik}] tarafından ${tur.toUpperCase()} yapıldı.`
         });
 
@@ -532,33 +463,26 @@
         document.getElementById('actionDesc').value = '';
         await urunleriVeStoklariYukle();
         sekmeDegistir('stok');
-
       } catch (err) {
-        console.error(err);
         bildirimGoster("Kayıt sırasında hata: " + err.message, "bg-rose-100 text-rose-800");
       }
     }
 
-    // Hareket Geçmişini Getir
     async function gecmisiYukle() {
       const { data, error } = await db.from('stock_transactions')
         .select('*, products(name, code, unit), warehouses(name)')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
+        .order('created_at', { ascending: false }).limit(20);
       const list = document.getElementById('historyList');
       if (error || !data || data.length === 0) {
         list.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Henüz bir stok hareketi bulunmuyor.</p>`;
         return;
       }
-
       const turRozetleri = {
         giris: 'bg-emerald-100 text-emerald-700 border-emerald-300',
         cikis: 'bg-rose-100 text-rose-700 border-rose-300',
         transfer: 'bg-blue-100 text-blue-700 border-blue-300',
         sayim_duzeltme: 'bg-amber-100 text-amber-700 border-amber-300'
       };
-
       list.innerHTML = data.map(item => {
         const tarih = new Date(item.created_at).toLocaleString('tr-TR');
         const pName = item.products ? item.products.name : 'Silinmiş Ürün';
@@ -583,11 +507,9 @@
       }).join('');
     }
 
-    // Modal İşlemleri
     function yeniUrunModalAc() {
-      const yetki = ROL_YETKILERI[aktifRol];
-      if (!yetki.yeniUrun) {
-        bildirimGoster(`YETKİSİZ: "${yetki.baslik}" rolü yeni ürün kartı açamaz!`, "bg-rose-100 text-rose-800");
+      if (!ROL_YETKILERI[aktifRol].yeniUrun) {
+        bildirimGoster(`YETKİSİZ: Bu rol yeni ürün kartı açamaz!`, "bg-rose-100 text-rose-800");
         return;
       }
       document.getElementById('productModal').classList.remove('hidden');
@@ -598,20 +520,89 @@
       const name = document.getElementById('newName').value.trim();
       const unit = document.getElementById('newUnit').value;
       const critical = parseInt(document.getElementById('newCritical').value) || 10;
-
-      if (!code || !name) {
-        alert("Lütfen ürün kodu ve ürün adını doldurunuz.");
-        return;
-      }
-
+      if (!code || !name) { alert("Lütfen ürün kodu ve ürün adını doldurunuz."); return; }
       const { error } = await db.from('products').insert({ code, name, unit, critical_stock: critical });
-      if (error) {
-        alert("Ürün eklenirken hata: " + error.message);
-      } else {
+      if (error) alert("Ürün eklenirken hata: " + error.message);
+      else {
         modalKapat();
         bildirimGoster(`[${code}] ${name} başarıyla eklendi!`, "bg-emerald-100 text-emerald-800");
         await urunleriVeStoklariYukle();
       }
+    }
+
+    // ==========================================
+    // MOLA YÖNETİMİ
+    // ==========================================
+    let molaListesi = JSON.parse(localStorage.getItem('depo_molalar') || '[]');
+    function molaListesiniKaydet() { localStorage.setItem('depo_molalar', JSON.stringify(molaListesi)); }
+    function aktifMolaGetir() { return molaListesi.find(m => m.durum === 'aktif'); }
+    function aktifMolaVarMi() { return !!aktifMolaGetir(); }
+
+    function molaBaslat() {
+      const personel = document.getElementById('molaPersonelSelect').value;
+      const tur = document.getElementById('molaTuruSelect').value;
+      const not = document.getElementById('molaNotu').value.trim() || 'Vardiya içi mola';
+      molaListesi.unshift({ id: Date.now(), personel, tur, not, baslangic: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), tarih: new Date().toLocaleDateString('tr-TR'), durum: 'aktif' });
+      molaListesiniKaydet();
+      document.getElementById('molaNotu').value = '';
+      bildirimGoster(`☕ ${personel} için "${tur}" başlatıldı. Personel işlemleri kilitlendi!`, "bg-amber-100 text-amber-800");
+      molaArayuzunuGuncelle();
+    }
+
+    function molayiBitir(id) {
+      const mola = molaListesi.find(m => m.id === id);
+      if (mola) {
+        mola.durum = 'tamamlandi';
+        mola.bitis = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        molaListesiniKaydet();
+        bildirimGoster(`✅ Mola sonlandırıldı. Personel yeniden stok hareketi yapabilir.`, "bg-emerald-100 text-emerald-800");
+        molaArayuzunuGuncelle();
+      }
+    }
+
+    function molaArayuzunuGuncelle() {
+      const aktif = aktifMolaGetir();
+      const banner = document.getElementById('molaBanner');
+      if (aktifRol === 'depo_personeli' && aktif) {
+        banner.classList.remove('hidden');
+        document.getElementById('molaDetayMetin').innerText = `${aktif.tur} (${aktif.baslangic})`;
+      } else { banner.classList.add('hidden'); }
+
+      if (aktifRol === 'depo_sorumlusu') {
+        document.getElementById('molaAdminView').classList.remove('hidden');
+        document.getElementById('molaUserView').classList.add('hidden');
+      } else {
+        document.getElementById('molaAdminView').classList.add('hidden');
+        document.getElementById('molaUserView').classList.remove('hidden');
+        document.getElementById('userMolaStatusText').innerHTML = aktif
+          ? `⚠️ Şu an <strong>${aktif.tur}</strong> durumundasınız (${aktif.baslangic}).<br><span class="text-rose-600 font-bold">Stok hareketleri kilitlidir.</span>`
+          : `✅ Aktif mola yok. Depo işlemlerine devam edebilirsiniz.`;
+      }
+
+      const aktifSayi = molaListesi.filter(m => m.durum === 'aktif').length;
+      document.getElementById('molaSayisiRozet').innerText = `${aktifSayi} Aktif Mola`;
+
+      const listeEl = document.getElementById('molaListesi');
+      if (molaListesi.length === 0) {
+        listeEl.innerHTML = `<p class="text-center text-slate-400 py-3 text-xs">Henüz mola kaydı bulunmuyor.</p>`;
+        return;
+      }
+      listeEl.innerHTML = molaListesi.slice(0, 10).map(m => {
+        const isAktif = m.durum === 'aktif';
+        return `
+          <div class="p-2.5 rounded-lg border ${isAktif ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50'} flex justify-between items-center">
+            <div>
+              <div class="flex items-center space-x-1.5">
+                <span class="font-bold text-slate-800">${m.tur}</span>
+                <span class="text-[10px] font-bold px-1.5 rounded ${isAktif ? 'bg-amber-200 text-amber-900 animate-pulse' : 'bg-slate-200 text-slate-600'}">${isAktif ? 'DEVAM EDİYOR' : 'BİTTİ'}</span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5">${m.personel} • ${m.baslangic}${m.bitis ? ' - ' + m.bitis : ''}</div>
+              ${m.not ? `<div class="text-[10px] text-slate-400 italic">${m.not}</div>` : ''}
+            </div>
+            ${(isAktif && aktifRol === 'depo_sorumlusu') ? `<button onclick="molayiBitir(${m.id})" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-2.5 py-1 rounded text-[11px] shadow">Molayı Bitir</button>` : ''}
+          </div>
+        `;
+      }).join('');
     }
   </script>
 </body>
