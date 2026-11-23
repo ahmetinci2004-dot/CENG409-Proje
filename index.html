@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobil Depo & Stok Takip Sistemi | CENG 409</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen pb-16">
+
+  <!-- Üst Başlık / Header -->
+  <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+        <div>
+          <h1 class="text-base font-bold leading-tight">Mobil Depo Takip</h1>
+          <p class="text-xs text-indigo-200">CENG 409 Dönem Projesi</p>
+        </div>
+      </div>
+      <!-- Rol Değiştirici (Hocanın istediği en az 2 rol) -->
+      <div class="text-right">
+        <span class="text-xs block text-indigo-200">Kullanıcı Rolü:</span>
+        <select id="userRole" onchange="degistirRol()" class="bg-indigo-700 text-xs font-semibold text-white px-2 py-1 rounded border border-indigo-400 focus:outline-none">
+          <option value="depo_sorumlusu">👑 Depo Sorumlusu</option>
+          <option value="depo_personeli">👷 Depo Personeli</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Ana İçerik / Mobil Kartlar -->
+  <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
+
+    <!-- Bildirim / Uyarı Kutusu -->
+    <div id="alertBox" class="hidden p-3 rounded-lg text-sm font-medium transition-all"></div>
+
+    <!-- Kritik Stok Uyarısı Banner'ı (Hocanın şartı) -->
+    <div id="criticalStockBanner" class="hidden bg-rose-50 border-l-4 border-rose-500 p-3 rounded shadow-sm">
+      <div class="flex items-center space-x-2 text-rose-700 font-bold text-xs uppercase">
+        <i class="fa-solid fa-triangle-exclamation text-base"></i>
+        <span>Kritik Stok Uyarıları Var!</span>
+      </div>
+      <ul id="criticalList" class="mt-1 text-xs text-rose-800 list-disc list-inside"></ul>
+    </div>
+
+    <!-- Tab / Sekme Butonları -->
+    <div class="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl text-center text-xs font-bold">
+      <button onclick="sekmeDegistir('stok')" id="tab-stok" class="py-2 rounded-lg bg-white text-indigo-600 shadow">
+        <i class="fa-solid fa-layer-group block text-sm mb-1"></i>Stoklar
+      </button>
+      <button onclick="sekmeDegistir('islem')" id="tab-islem" class="py-2 rounded-lg text-slate-600">
+        <i class="fa-solid fa-arrow-right-arrow-left block text-sm mb-1"></i>Hızlı İşlem
+      </button>
+      <button onclick="sekmeDegistir('gecmis')" id="tab-gecmis" class="py-2 rounded-lg text-slate-600">
+        <i class="fa-solid fa-clock-rotate-left block text-sm mb-1"></i>Geçmiş
+      </button>
+    </div>
+
+    <!-- 1. SEKME: GÜNCEL STOK LİSTESİ VE ARAMA -->
+    <section id="sec-stok" class="space-y-3">
+      <!-- Arama Kutusu -->
+      <div class="relative">
+        <input type="text" id="searchInput" oninput="urunFiltrele()" placeholder="Ürün kodu veya adı ile ara..." 
+               class="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl shadow-sm border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
+      </div>
+
+      <!-- Yeni Ürün Ekle Butonu (Sadece Depo Sorumlusu Görebilir) -->
+      <div id="adminProductBtn" class="flex justify-end">
+        <button onclick="yeniUrunModalAc()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 shadow">
+          <i class="fa-solid fa-plus"></i>
+          <span>Yeni Ürün Tanımla</span>
+        </button>
+      </div>
+
+      <!-- Ürün Kartları Listesi -->
+      <div id="productList" class="space-y-2.5">
+        <div class="text-center py-8 text-slate-400 text-sm">
+          <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-indigo-500"></i>
+          <p>Veriler Supabase'den yükleniyor...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. SEKME: STOK İŞLEMİ (GİRİŞ / ÇIKIŞ / TRANSFER) -->
+    <section id="sec-islem" class="hidden bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+      <h2 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b pb-2">
+        <i class="fa-solid fa-dolly text-indigo-600"></i>
+        <span>Stok Hareketi Gerçekleştir</span>
+      </h2>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">İşlem Türü:</label>
+        <select id="actionType" onchange="islemTuruDegisti()" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500">
+          <option value="giris">📥 Stok Girişi (+)</option>
+          <option value="cikis">📤 Stok Çıkışı (-)</option>
+          <option value="transfer">🔄 Depolar Arası Transfer</option>
+          <option value="sayim_duzeltme">⚖️ Sayım Düzeltme (Sadece Sorumlu)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Ürün Seçin:</label>
+        <select id="actionProduct" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
+      </div>
+
+      <div id="sourceWarehouseDiv">
+        <label id="sourceLabel" class="block text-xs font-semibold text-slate-600 mb-1">Depo / Ambar:</label>
+        <select id="sourceWarehouse" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
+      </div>
+
+      <div id="targetWarehouseDiv" class="hidden">
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Hedef Depo (Transfer):</label>
+        <select id="targetWarehouse" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500"></select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Raf Konumu:</label>
+          <input type="text" id="actionShelf" value="A1" placeholder="Örn: B2-04" class="w-full p-2 bg-slate-50 border rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Miktar:</label>
+          <input type="number" id="actionQuantity" min="1" value="1" class="w-full p-2 bg-slate-50 border rounded-lg text-sm font-bold text-indigo-600">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Açıklama / Not:</label>
+        <input type="text" id="actionDesc" placeholder="Örn: İrsaliye No / Müşteri Teslimatı" class="w-full p-2 bg-slate-50 border rounded-lg text-sm">
+      </div>
+
+      <button onclick="stokHareketiKaydet()" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm shadow transition">
+        İşlemi Tamamla ve Kaydet
+      </button>
+    </section>
+
+    <!-- 3. SEKME: İŞLEM GEÇMİŞİ / AUDIT LOG -->
+    <section id="sec-gecmis" class="hidden space-y-2">
+      <div class="flex justify-between items-center px-1">
+        <h2 class="text-xs font-bold text-slate-600 uppercase">Son Stok Hareketleri</h2>
+        <button onclick="gecmisiYukle()" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">
+          <i class="fa-solid fa-rotate-right mr-1"></i>Yenile
+        </button>
+      </div>
+      <div id="historyList" class="space-y-2">
+        <p class="text-center text-xs text-slate-400 py-4">Kayıtlar yükleniyor...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- YENİ ÜRÜN MODAL -->
+  <div id="productModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-2xl">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-sm text-slate-800">Yeni Ürün Kartı Aç</h3>
+        <button onclick="modalKapat()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600">Ürün Kodu:</label>
+          <input type="text" id="newCode" placeholder="Örn: PRD004" class="w-full p-2 border rounded-lg text-sm uppercase">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600">Ürün Adı:</label>
+          <input type="text" id="newName" placeholder="Örn: 10mm Çelik Tel" class="w-full p-2 border rounded-lg text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600">Birim:</label>
+            <select id="newUnit" class="w-full p-2 border rounded-lg text-sm">
+              <option value="adet">Adet</option>
+              <option value="koli">Koli</option>
+              <option value="litre">Litre</option>
+              <option value="kg">Kg</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600">Kritik Stok:</label>
+            <input type="number" id="newCritical" value="10" min="1" class="w-full p-2 border rounded-lg text-sm">
+          </div>
+        </div>
+      </div>
+      <div class="flex space-x-2 pt-2">
+        <button onclick="modalKapat()" class="w-1/2 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold">İptal</button>
+        <button onclick="yeniUrunKaydet()" class="w-1/2 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold shadow">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UYGULAMA JAVASCRIPT KODLARI (SUPABASE ENTEGRASYONU) -->
+  <script>
+    // Supabase Bağlantısı (Kullanıcı Bilgileri)
+    const SUPABASE_URL = "https://xsnkfhoircrbizxiditg.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_eADCSvq2tX1vGUHFIr5Ewg_fxoHeypA";
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let tumUrunler = [];
+    let tumDepolar = [];
+    let aktifRol = 'depo_sorumlusu';
+
+    // Sayfa Yüklendiğinde
+    window.addEventListener('DOMContentLoaded', async () => {
+      await depolariYukle();
+      await urunleriVeStoklariYukle();
+      await gecmisiYukle();
+    });
+
+    // Rol Değiştirme
+    function degistirRol() {
+      aktifRol = document.getElementById('userRole').value;
+      const adminBtn = document.getElementById('adminProductBtn');
+      if (aktifRol === 'depo_sorumlusu') {
+        adminBtn.classList.remove('hidden');
+        bildirimGoster("👑 Depo Sorumlusu rolüne geçildi. Tüm yetkiler aktif.", "bg-indigo-100 text-indigo-800");
+      } else {
+        adminBtn.classList.add('hidden');
+        bildirimGoster("👷 Depo Personeli rolüne geçildi. Yetkiler sınırlandırıldı.", "bg-amber-100 text-amber-800");
+      }
+    }
+
+    // Bildirim Gösterme
+    function bildirimGoster(mesaj, stil = "bg-emerald-100 text-emerald-800") {
+      const box = document.getElementById('alertBox');
+      box.className = `p-3 rounded-lg text-xs font-medium transition-all shadow-sm ${stil}`;
+      box.innerHTML = `<i class="fa-solid fa-circle-info mr-1"></i> ${mesaj}`;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 5000);
+    }
+
+    // Depoları Çek
+    async function depolariYukle() {
+      const { data, error } = await db.from('warehouses').select('*');
+      if (!error && data) {
+        tumDepolar = data;
+        const sSelect = document.getElementById('sourceWarehouse');
+        const tSelect = document.getElementById('targetWarehouse');
+        sSelect.innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
+        tSelect.innerHTML = data.map(d => `<option value="${d.id}">${d.name} (${d.location})</option>`).join('');
+      }
+    }
+
+    // Ürünleri ve Stokları Çek
+    async function urunleriVeStoklariYukle() {
+      const { data: products, error: pErr } = await db.from('products').select('*').order('code');
+      const { data: stocks, error: sErr } = await db.from('stock').select('*');
+
+      if (pErr) {
+        console.error("Hata:", pErr);
+        document.getElementById('productList').innerHTML = `<p class="text-center text-xs text-rose-500 py-4">Veri yüklenemedi. Lütfen Supabase bağlantısını kontrol edin.</p>`;
+        return;
+      }
+
+      tumUrunler = products.map(p => {
+        const productStocks = (stocks || []).filter(s => s.product_id === p.id);
+        const toplamMiktar = productStocks.reduce((sum, item) => sum + item.quantity, 0);
+        return { ...p, toplamMiktar, detaylar: productStocks };
+      });
+
+      // İşlem sekmesindeki ürün seçiciyi güncelle
+      const pSelect = document.getElementById('actionProduct');
+      pSelect.innerHTML = tumUrunler.map(p => `<option value="${p.id}">[${p.code}] ${p.name} (Stok: ${p.toplamMiktar} ${p.unit})</option>`).join('');
+
+      kartlariEkranaBas(tumUrunler);
+      kritikStokKontrol(tumUrunler);
+    }
+
+    // Kartları Bas
+    function kartlariEkranaBas(liste) {
+      const container = document.getElementById('productList');
+      if (liste.length === 0) {
+        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Kayıtlı ürün bulunamadı.</p>`;
+        return;
+      }
+
+      container.innerHTML = liste.map(item => {
+        const isKritik = item.toplamMiktar <= item.critical_stock;
+        return `
+          <div class="bg-white p-3.5 rounded-xl border ${isKritik ? 'border-rose-300 bg-rose-50/20' : 'border-slate-200'} shadow-sm space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="inline-block text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider">${item.code}</span>
+                <h3 class="text-sm font-bold text-slate-800 leading-tight mt-0.5">${item.name}</h3>
+              </div>
+              <div class="text-right">
+                <span class="text-base font-extrabold ${isKritik ? 'text-rose-600' : 'text-indigo-600'}">${item.toplamMiktar}</span>
+                <span class="text-xs text-slate-500 font-medium ml-0.5">${item.unit}</span>
+              </div>
+            </div>
+            
+            <div class="flex justify-between items-center text-xs text-slate-500 pt-1 border-t border-slate-100">
+              <span>Kritik Eşik: <strong class="text-slate-700">${item.critical_stock} ${item.unit}</strong></span>
+              ${isKritik ? '<span class="text-rose-600 font-bold flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Kritik Seviye!</span>' : '<span class="text-emerald-600 font-medium"><i class="fa-solid fa-check mr-1"></i>Yeterli</span>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Kritik Stok Kontrolü
+    function kritikStokKontrol(liste) {
+      const kritikOlanlar = liste.filter(i => i.toplamMiktar <= i.critical_stock);
+      const banner = document.getElementById('criticalStockBanner');
+      const kList = document.getElementById('criticalList');
+      if (kritikOlanlar.length > 0) {
+        banner.classList.remove('hidden');
+        kList.innerHTML = kritikOlanlar.map(k => `<li><strong>${k.name}</strong> (${k.toplamMiktar} ${k.unit} kaldı, kritik sınır: ${k.critical_stock})</li>`).join('');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    // Arama Filtresi
+    function urunFiltrele() {
+      const term = document.getElementById('searchInput').value.toLowerCase();
+      const filtrelenmis = tumUrunler.filter(u => u.name.toLowerCase().includes(term) || u.code.toLowerCase().includes(term));
+      kartlariEkranaBas(filtrelenmis);
+    }
+
+    // Sekme Değiştirici
+    function sekmeDegistir(sekme) {
+      ['stok', 'islem', 'gecmis'].forEach(s => {
+        document.getElementById(`sec-${s}`).classList.add('hidden');
+        document.getElementById(`tab-${s}`).className = "py-2 rounded-lg text-slate-600";
+      });
+      document.getElementById(`sec-${sekme}`).classList.remove('hidden');
+      document.getElementById(`tab-${sekme}`).className = "py-2 rounded-lg bg-white text-indigo-600 shadow font-bold";
+      if (sekme === 'gecmis') gecmisiYukle();
+    }
+
+    // İşlem Türü Değişimi
+    function islemTuruDegisti() {
+      const tur = document.getElementById('actionType').value;
+      const targetDiv = document.getElementById('targetWarehouseDiv');
+      const sourceLabel = document.getElementById('sourceLabel');
+      
+      if (tur === 'transfer') {
+        targetDiv.classList.remove('hidden');
+        sourceLabel.innerText = "Kaynak Depo (Çıkış):";
+      } else {
+        targetDiv.classList.add('hidden');
+        sourceLabel.innerText = "Depo / Ambar:";
+      }
+    }
+
+    // STOK HAREKETİ KAYDET (HOCANIN İSTEDİĞİ KÖTÜ DURUM KONTROLLERİ VE İŞ KURALLARI)
+    async function stokHareketiKaydet() {
+      const tur = document.getElementById('actionType').value;
+      const productId = document.getElementById('actionProduct').value;
+      const sourceWarehouseId = document.getElementById('sourceWarehouse').value;
+      const targetWarehouseId = document.getElementById('targetWarehouse').value;
+      const shelf = document.getElementById('actionShelf').value.trim() || 'A1';
+      const miktar = parseInt(document.getElementById('actionQuantity').value);
+      const desc = document.getElementById('actionDesc').value.trim();
+
+      // KÖTÜ DURUM 1: Negatif veya sıfır miktar girişi
+      if (isNaN(miktar) || miktar <= 0) {
+        bildirimGoster("Hata: İşlem miktarı 1 veya daha büyük olmalıdır!", "bg-rose-100 text-rose-800");
+        return;
+      }
+
+      // KÖTÜ DURUM 2: Yetkisiz kullanıcının sayım düzeltmesi yapmaya çalışması
+      if (tur === 'sayim_duzeltme' && aktifRol !== 'depo_sorumlusu') {
+        bildirimGoster("YETKİSİZ İŞLEM: Sayım düzeltme işlemini yalnızca Depo Sorumlusu yapabilir!", "bg-rose-100 text-rose-800");
+        return;
+      }
+
+      // KÖTÜ DURUM 3: Transferde kaynak ve hedef deponun aynı seçilmesi
+      if (tur === 'transfer' && sourceWarehouseId === targetWarehouseId) {
+        bildirimGoster("Hata: Kaynak ve hedef depo aynı olamaz!", "bg-rose-100 text-rose-800");
+        return;
+      }
+
+      // Mevcut depodaki stok kaydını kontrol et
+      const { data: stockRecords } = await db.from('stock')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('warehouse_id', sourceWarehouseId);
+
+      const mevcutKayit = stockRecords && stockRecords[0] ? stockRecords[0] : null;
+      const mevcutStok = mevcutKayit ? mevcutKayit.quantity : 0;
+
+      // KÖTÜ DURUM 4: Mevcut stoktan fazla çıkış veya transfer yapılmaya çalışılması (Negatif stok engelleme)
+      if ((tur === 'cikis' || tur === 'transfer') && miktar > mevcutStok) {
+        bildirimGoster(`YETERSİZ STOK: Depoda sadece ${mevcutStok} adet var. ${miktar} adet çıkış yapılamaz!`, "bg-rose-100 text-rose-800");
+        return;
+      }
+
+      try {
+        // 1. Stok tablosunu güncelle
+        if (tur === 'giris') {
+          if (mevcutKayit) {
+            await db.from('stock').update({ quantity: mevcutStok + miktar }).eq('id', mevcutKayit.id);
+          } else {
+            await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf: shelf, quantity: miktar });
+          }
+        } else if (tur === 'cikis') {
+          await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
+        } else if (tur === 'transfer') {
+          // Kaynaktan düş
+          await db.from('stock').update({ quantity: mevcutStok - miktar }).eq('id', mevcutKayit.id);
+          // Hedefe ekle
+          const { data: targetRecords } = await db.from('stock').select('*').eq('product_id', productId).eq('warehouse_id', targetWarehouseId);
+          if (targetRecords && targetRecords[0]) {
+            await db.from('stock').update({ quantity: targetRecords[0].quantity + miktar }).eq('id', targetRecords[0].id);
+          } else {
+            await db.from('stock').insert({ product_id: productId, warehouse_id: targetWarehouseId, shelf: shelf, quantity: miktar });
+          }
+        } else if (tur === 'sayim_duzeltme') {
+          if (mevcutKayit) {
+            await db.from('stock').update({ quantity: miktar }).eq('id', mevcutKayit.id);
+          } else {
+            await db.from('stock').insert({ product_id: productId, warehouse_id: sourceWarehouseId, shelf: shelf, quantity: miktar });
+          }
+        }
+
+        // 2. Hareket Geçmişine Kaydet (Audit Log)
+        await db.from('stock_transactions').insert({
+          transaction_type: tur,
+          product_id: productId,
+          source_warehouse_id: sourceWarehouseId,
+          target_warehouse_id: tur === 'transfer' ? targetWarehouseId : null,
+          quantity: miktar,
+          user_email: `${aktifRol}@pau.edu.tr`,
+          description: desc || `${tur.toUpperCase()} işlemi gerçekleştirildi.`
+        });
+
+        bildirimGoster("✅ Stok hareketi başarıyla kaydedildi ve veritabanı güncellendi!", "bg-emerald-100 text-emerald-800");
+        document.getElementById('actionDesc').value = '';
+        await urunleriVeStoklariYukle();
+        sekmeDegistir('stok');
+
+      } catch (err) {
+        console.error(err);
+        bildirimGoster("Kayıt sırasında bir hata meydana geldi: " + err.message, "bg-rose-100 text-rose-800");
+      }
+    }
+
+    // Hareket Geçmişini Getir
+    async function gecmisiYukle() {
+      const { data, error } = await db.from('stock_transactions')
+        .select('*, products(name, code, unit), warehouses(name)')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const list = document.getElementById('historyList');
+      if (error || !data || data.length === 0) {
+        list.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Henüz bir stok hareketi bulunmuyor.</p>`;
+        return;
+      }
+
+      const turRozetleri = {
+        giris: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+        cikis: 'bg-rose-100 text-rose-700 border-rose-300',
+        transfer: 'bg-blue-100 text-blue-700 border-blue-300',
+        sayim_duzeltme: 'bg-amber-100 text-amber-700 border-amber-300'
+      };
+
+      list.innerHTML = data.map(item => {
+        const tarih = new Date(item.created_at).toLocaleString('tr-TR');
+        const pName = item.products ? item.products.name : 'Silinmiş Ürün';
+        const pCode = item.products ? item.products.code : '-';
+        const unit = item.products ? item.products.unit : 'adet';
+        return `
+          <div class="bg-white p-3 rounded-xl border border-slate-200 text-xs shadow-sm space-y-1">
+            <div class="flex justify-between items-center">
+              <span class="font-bold uppercase text-[10px] px-1.5 py-0.5 rounded border ${turRozetleri[item.transaction_type] || 'bg-slate-100'}">${item.transaction_type}</span>
+              <span class="text-[10px] text-slate-400">${tarih}</span>
+            </div>
+            <div class="flex justify-between items-baseline font-medium">
+              <span class="text-slate-800">[${pCode}] ${pName}</span>
+              <span class="font-extrabold text-sm text-slate-900">${item.quantity} ${unit}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 flex justify-between pt-1 border-t border-slate-50">
+              <span>İşlem Yapan: <span class="font-semibold text-slate-600">${item.user_email || 'Bilinmiyor'}</span></span>
+              <span class="italic text-slate-400">${item.description || ''}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Modal İşlemleri
+    function yeniUrunModalAc() { document.getElementById('productModal').classList.remove('hidden'); }
+    function modalKapat() { document.getElementById('productModal').classList.add('hidden'); }
+    async function yeniUrunKaydet() {
+      const code = document.getElementById('newCode').value.trim().toUpperCase();
+      const name = document.getElementById('newName').value.trim();
+      const unit = document.getElementById('newUnit').value;
+      const critical = parseInt(document.getElementById('newCritical').value) || 10;
+
+      if (!code || !name) {
+        alert("Lütfen ürün kodu ve ürün adını doldurunuz.");
+        return;
+      }
+
+      const { error } = await db.from('products').insert({ code, name, unit, critical_stock: critical });
+      if (error) {
+        alert("Ürün eklenirken hata: " + error.message);
+      } else {
+        modalKapat();
+        bildirimGoster(`[${code}] ${name} başarıyla eklendi!`, "bg-emerald-100 text-emerald-800");
+        await urunleriVeStoklariYukle();
+      }
+    }
+  </script>
+</body>
+</html>
